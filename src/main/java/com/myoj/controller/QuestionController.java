@@ -11,10 +11,15 @@ import com.myoj.constant.UserConstant;
 import com.myoj.exception.BusinessException;
 import com.myoj.exception.ThrowUtils;
 import com.myoj.model.dto.question.*;
+import com.myoj.model.dto.questionsubmit.QuestionSubmitAddRequest;
+import com.myoj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.myoj.model.entity.Question;
+import com.myoj.model.entity.QuestionSubmit;
 import com.myoj.model.entity.User;
+import com.myoj.model.vo.QuestionSubmitVO;
 import com.myoj.model.vo.QuestionVO;
 import com.myoj.service.QuestionService;
+import com.myoj.service.QuestionSubmitService;
 import com.myoj.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -40,8 +45,45 @@ public class QuestionController {
     @Resource
     private UserService userService;
 
-    // region 增删改查
+    @Resource
+    private QuestionSubmitService questionSubmitService;
 
+
+    /**
+     * 提交题目
+     *
+     * @param questionSubmitAddRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/question_submit/do")
+    public BaseResponse<Long> doQuestionSubmit(@RequestBody QuestionSubmitAddRequest questionSubmitAddRequest,
+                                               HttpServletRequest request) {
+        if (questionSubmitAddRequest == null || questionSubmitAddRequest.getQuestionId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        // 登录才能提交
+        final User loginUser = userService.getLoginUser(request);
+        long questionSubmitId = questionSubmitService.doQuestionSubmit(questionSubmitAddRequest, loginUser);
+        return ResultUtils.success(questionSubmitId);
+    }
+
+    /**
+     * 分页获取列表（除了管理员，普通用户只能看到非答案、提交代码等公开信息）
+     *
+     * @param questionSubmitQueryRequest
+     * @return
+     */
+    @PostMapping("/question_submit/list/page")
+    public BaseResponse<Page<QuestionSubmitVO>> listQuestionSubmitByPage(
+            @RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest, HttpServletRequest request) {
+        long current = questionSubmitQueryRequest.getCurrent();
+        long size = questionSubmitQueryRequest.getPageSize();
+        User loginUser = userService.getLoginUser(request);
+        Page<QuestionSubmit> questionSubmitPage = questionSubmitService.page(new Page<>(current, size),
+                questionSubmitService.getQuerySubmitWrapper(questionSubmitQueryRequest));
+        return ResultUtils.success(questionSubmitService.getQuestionSubmitVOPage(questionSubmitPage, loginUser));
+    }
     /**
      * 创建
      *
@@ -148,6 +190,27 @@ public class QuestionController {
      * @param id
      * @return
      */
+    @GetMapping("/get")
+    public BaseResponse<Question> getQuestionById(long id, HttpServletRequest request) {
+        if (id <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        Question question = questionService.getById(id);
+        if (question == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        if(!question.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)){
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
+        }
+        return ResultUtils.success(question);
+    }
+    /**
+     * 根据 id 获取 vo
+     *
+     * @param id
+     * @return
+     */
     @GetMapping("/get/vo")
     public BaseResponse<QuestionVO> getQuestionVOById(long id, HttpServletRequest request) {
         if (id <= 0) {
@@ -189,7 +252,7 @@ public class QuestionController {
         long current = questionQueryRequest.getCurrent();
         long size = questionQueryRequest.getPageSize();
         // 限制爬虫
-        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
+//        ThrowUtils.throwIf(size > 20, ErrorCode.PARAMS_ERROR);
         Page<Question> questionPage = questionService.page(new Page<>(current, size),
                 questionService.getQueryWrapper(questionQueryRequest));
         return ResultUtils.success(questionService.getQuestionVOPage(questionPage, request));

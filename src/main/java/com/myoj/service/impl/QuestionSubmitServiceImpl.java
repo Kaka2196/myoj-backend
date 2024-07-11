@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.myoj.common.ErrorCode;
 import com.myoj.constant.CommonConstant;
 import com.myoj.exception.BusinessException;
+import com.myoj.judge.JudgeService;
+import com.myoj.judge.strategy.JudgeManager;
+import com.myoj.judge.strategy.JudgeStrategy;
 import com.myoj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.myoj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.myoj.model.entity.Question;
@@ -25,11 +28,13 @@ import com.myoj.utils.SqlUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -44,6 +49,9 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     private QuestionService questionService;
     @Resource
     private UserService userService;
+    @Resource
+    @Lazy
+    private JudgeService judgeService;
 
     /**
      * 点赞
@@ -72,14 +80,19 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         QuestionSubmit questionSubmit = new QuestionSubmit();
         BeanUtils.copyProperties(questionSubmitAddRequest, questionSubmit);
         questionSubmit.setUserId(userId);
-        //todo 设置初始状态
+        //设置初始状态
         questionSubmit.setJudgeInfo("{}");
         questionSubmit.setStatus(QuestionSubmitStatusEnum.WAITING.getValue());
         boolean save = this.save(questionSubmit);
         if (!save) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "数据插入失败");
         }
-        return questionSubmit.getId();
+        Long questionSubmitId = questionSubmit.getId();
+        // 异步执行判题服务
+        CompletableFuture.runAsync(() -> {
+            judgeService.doJudge(questionSubmitId);
+        });
+        return questionSubmitId;
     }
 
     /**
@@ -135,7 +148,7 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         if (questionId != null && questionId > 0) {
             question = questionService.getById(questionId);
         }
-        QuestionVO questionVO = questionService.getQuestionVO(question, null);
+        QuestionVO questionVO = null;
         questionSubmitVO.setQuestionVO(questionVO);
         return questionSubmitVO;
     }

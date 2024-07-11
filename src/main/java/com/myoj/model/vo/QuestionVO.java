@@ -120,12 +120,16 @@ public class QuestionVO implements Serializable {
         if (question == null) {
             return null;
         }
-        List<String> tagList = JSONUtil.toList(question.getTags(), String.class);
-        JudgeConfig judgeConfig = JSONUtil.toBean(question.getJudgeConfig(), JudgeConfig.class);
         QuestionVO questionVO = new QuestionVO();
+        if(question.getTags()!=null){
+            List<String> tagList = JSONUtil.toList(question.getTags(), String.class);
+            questionVO.setTags(tagList);
+        }
+        if(question.getJudgeConfig()!=null){
+            JudgeConfig judgeConfig = JSONUtil.toBean(question.getJudgeConfig(), JudgeConfig.class);
+            questionVO.setJudgeConfig(judgeConfig);
+        }
         BeanUtils.copyProperties(question, questionVO);
-        questionVO.setTags(tagList);
-        questionVO.setJudgeConfig(judgeConfig);
         return questionVO;
     }
 

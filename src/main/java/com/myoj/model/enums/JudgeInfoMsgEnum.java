@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
  */
 public enum JudgeInfoMsgEnum {
 
+    WAITING("等待中","Waiting"),
     ACCEPTED("成功", "Accepted"),
     WRONG_ANSWER("答案错误", "Wrong Answer"),
     COMPILE_ERROR("编译错误","Compile Error"),
