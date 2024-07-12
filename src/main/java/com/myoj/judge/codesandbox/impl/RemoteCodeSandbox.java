@@ -9,6 +9,7 @@ import com.myoj.exception.BusinessException;
 import com.myoj.judge.codesandbox.CodeSandbox;
 import com.myoj.judge.codesandbox.model.ExecuteCodeRequest;
 import com.myoj.judge.codesandbox.model.ExecuteCodeResponse;
+import com.myoj.model.enums.QuestionSubmitStatusEnum;
 import org.apache.http.auth.AUTH;
 
 /**
@@ -24,14 +25,19 @@ public class RemoteCodeSandbox implements CodeSandbox {
         System.out.println("调用远程代码沙箱中......");
         String url = "http://117.72.70.116:8082/exe";
         String jsonStr = JSONUtil.toJsonStr(executeCodeRequest);
-        String res = HttpUtil.createPost(url)
-                .header(AUTH_REQUEST_HEADER, AUTH_REQUEST_SECRET)
-                .body(jsonStr)
-                .execute()
-                .body();
-        if(StrUtil.isBlank(res)){
-            throw new BusinessException(ErrorCode.API_REQUEST_ERROR,res);
+        try{
+            String res = HttpUtil.createPost(url)
+                    .header(AUTH_REQUEST_HEADER, AUTH_REQUEST_SECRET)
+                    .body(jsonStr)
+                    .execute()
+                    .body();
+            System.out.println(res);
+            return JSONUtil.toBean(res, ExecuteCodeResponse.class);
+        } catch (Exception e){
+            ExecuteCodeResponse res = new ExecuteCodeResponse();
+            res.setStatus(QuestionSubmitStatusEnum.FAILED.getValue());
+            System.out.println("调用错误");
+            return res;
         }
-        return JSONUtil.toBean(res, ExecuteCodeResponse.class);
     }
 }
